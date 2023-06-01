@@ -1,4 +1,4 @@
-import os, gridfs, pika, json
+import gridfs, pika, json
 from flask import Flask, request, send_file
 from flask_pymongo import PyMongo
 from auth import validate
@@ -14,9 +14,6 @@ mongo_mp3 = PyMongo(server, uri="mongodb://host.minikube.internal:27017/mp3s")
 
 fs_videos = gridfs.GridFS(mongo_video.db)
 fs_mp3s = gridfs.GridFS(mongo_mp3.db)
-
-connection = pika.BlockingConnection(pika.ConnectionParameters("rabbitmq"))
-channel = connection.channel()
 
 
 @server.route("/login", methods=["POST"])
@@ -42,11 +39,17 @@ def upload():
         if len(request.files) > 1 or len(request.files) < 1:
             return "exactly 1 file required", 400
 
+
         for _, f in request.files.items():
+            connection = pika.BlockingConnection(pika.ConnectionParameters("rabbitmq"))
+            channel = connection.channel()
             err = util.upload(f, fs_videos, channel, access)
 
             if err:
+                channel.close()
                 return err
+            
+            channel.close()
 
         return "success!", 200
     else:
